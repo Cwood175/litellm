@@ -695,6 +695,7 @@ class LangFuseLogger:
             for key in list(
                 filter(lambda k: k.startswith("generation_"), clean_metadata.keys())
             ):
+                stripped = key.replace("generation_", "", 1)
                 if stripped not in generation_params:
                     generation_params[stripped] = clean_metadata[key]
 
