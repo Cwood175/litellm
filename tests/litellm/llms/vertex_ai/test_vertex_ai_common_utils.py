@@ -294,6 +294,10 @@ def test_process_items_basic():
     process_items(schema)
     assert schema["properties"]["nested"]["items"] == {"type": "object"}
 
+@pytest.fixture
+def stream():
+    return True
+
 def test_get_vertex_url_global_region(stream):
     """
     Test _get_vertex_url when vertex_location is 'global' for chat mode.
