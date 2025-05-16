@@ -125,7 +125,7 @@ def test_get_cost_for_anthropic_web_search():
     """
     from litellm.types.utils import ServerToolUse, Usage
 
-    model = "claude-3-7-sonnet-latest"
+    model = "claude-3-5-sonnet-20241022"
     usage = Usage(server_tool_use=ServerToolUse(web_search_requests=1))
     cost = StandardBuiltInToolCostTracking.get_cost_for_built_in_tools(
         model=model,

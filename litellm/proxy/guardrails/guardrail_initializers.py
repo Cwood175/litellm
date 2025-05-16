@@ -68,6 +68,8 @@ def initialize_presidio(litellm_params: LitellmParams, guardrail: Guardrail):
         _OPTIONAL_PresidioPIIMasking,
     )
 
+    presidio_analyzer_api_base = litellm_params.presidio_analyzer_api_base or "http://localhost:5002"
+
     _presidio_callback = _OPTIONAL_PresidioPIIMasking(
         guardrail_name=guardrail.get("guardrail_name", ""),
         event_hook=litellm_params.mode,
@@ -76,7 +78,7 @@ def initialize_presidio(litellm_params: LitellmParams, guardrail: Guardrail):
         mock_redacted_text=litellm_params.mock_redacted_text,
         default_on=litellm_params.default_on,
         pii_entities_config=litellm_params.pii_entities_config,
-        presidio_analyzer_api_base=litellm_params.presidio_analyzer_api_base,
+        presidio_analyzer_api_base=presidio_analyzer_api_base,
         presidio_anonymizer_api_base=litellm_params.presidio_anonymizer_api_base,
     )
     litellm.logging_callback_manager.add_litellm_callback(_presidio_callback)
@@ -88,7 +90,7 @@ def initialize_presidio(litellm_params: LitellmParams, guardrail: Guardrail):
             event_hook=GuardrailEventHooks.post_call.value,
             presidio_ad_hoc_recognizers=litellm_params.presidio_ad_hoc_recognizers,
             default_on=litellm_params.default_on,
-            presidio_analyzer_api_base=litellm_params.presidio_analyzer_api_base,
+            presidio_analyzer_api_base=presidio_analyzer_api_base,
             presidio_anonymizer_api_base=litellm_params.presidio_anonymizer_api_base,
         )
         litellm.logging_callback_manager.add_litellm_callback(_success_callback)

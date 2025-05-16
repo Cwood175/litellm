@@ -30,9 +30,13 @@ def test_initialize_presidio_guardrail():
     }
 
     # Call the initialize_guardrail method
-    result = InitializeGuardrails.initialize_guardrail(
-        guardrail=test_guardrail,
-    )
+    with patch.dict(
+        os.environ,
+        {"PRESIDIO_ANALYZER_API_BASE": "https://fakelink.com/v1/presidio/analyze"},
+    ):
+        result = InitializeGuardrails.initialize_guardrail(
+            guardrail=test_guardrail,
+        )
 
     assert result["guardrail_name"] == "test_presidio_guardrail"
     assert (
