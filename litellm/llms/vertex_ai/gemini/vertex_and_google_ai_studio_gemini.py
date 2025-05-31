@@ -388,6 +388,8 @@ class VertexGeminiConfig(VertexAIBaseConfig, BaseConfig):
             optional_params["response_schema"] = self._map_response_schema(
                 value=optional_params["response_schema"]
             )
+        elif "response_schema" in new_value:
+            optional_params["response_schema"] = new_value["response_schema"]
 
     @staticmethod
     def _map_reasoning_effort_to_thinking_budget(

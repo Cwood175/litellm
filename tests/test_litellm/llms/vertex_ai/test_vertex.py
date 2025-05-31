@@ -90,7 +90,7 @@ def test_completion_pydantic_obj_2():
     }
     client = HTTPHandler()
     with patch.object(client, "post", new=MagicMock()) as mock_post:
-        mock_post.return_value = expected_request_body
+        mock_post.return_value = MagicMock(raise_for_status=MagicMock())
         try:
             response = litellm.completion(
                 model="gemini/gemini-1.5-pro",
