@@ -90,7 +90,10 @@ def test_completion_pydantic_obj_2():
     }
     client = HTTPHandler()
     with patch.object(client, "post", new=MagicMock()) as mock_post:
-        mock_post.return_value = expected_request_body
+        mock_response = MagicMock()
+        mock_response.raise_for_status = MagicMock()
+        mock_response.json.return_value = {"candidates": [{"content": {"parts": [{"text": "test"}]}}]}
+        mock_post.return_value = mock_response
         try:
             response = litellm.completion(
                 model="gemini/gemini-1.5-pro",
