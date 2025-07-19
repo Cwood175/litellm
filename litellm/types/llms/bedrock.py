@@ -481,6 +481,7 @@ class AmazonNovaCanvasInpaintingParams(TypedDict, total=False):
     """
     Params for Amazon Nova Canvas Inpainting API
     """
+
     text: str
     maskImage: str
     inputImage: str
@@ -495,6 +496,7 @@ class AmazonNovaCanvasInpaintingRequest(
 
     Ref: https://docs.aws.amazon.com/nova/latest/userguide/image-gen-req-resp-structure.html
     """
+
     taskType: Literal["INPAINTING"]
     inpaintingParams: AmazonNovaCanvasInpaintingParams
     imageGenerationConfig: AmazonNovaCanvasImageGenerationConfig
@@ -504,6 +506,7 @@ if TYPE_CHECKING:
     from botocore.awsrequest import AWSPreparedRequest
 else:
     AWSPreparedRequest = Any
+
 
 class BedrockPreparedRequest(TypedDict):
     """
