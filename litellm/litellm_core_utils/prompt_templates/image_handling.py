@@ -17,8 +17,10 @@ in_memory_cache = InMemoryCache(max_size_in_memory=MAX_IMGS_IN_MEMORY)
 
 def _process_image_response(response: Response, url: str) -> str:
     if response.status_code != 200:
-        raise Exception(
-            f"Error: Unable to fetch image from URL. Status code: {response.status_code}, url={url}"
+        raise httpx.HTTPStatusError(
+            f"Error: Unable to fetch image from URL. Status code: {response.status_code}, url={url}",
+            request=response.request,
+            response=response
         )
 
     image_bytes = response.content
@@ -35,7 +37,7 @@ def _process_image_response(response: Response, url: str) -> str:
             "webp": "image/webp",
         }.get(img_type)
         if _img_type is None:
-            raise Exception(
+            raise ValueError(
                 f"Error: Unsupported image format. Format={_img_type}. Supported types = ['image/jpeg', 'image/png', 'image/gif', 'image/webp']"
             )
         img_type = _img_type
