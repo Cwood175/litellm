@@ -17,9 +17,7 @@ in_memory_cache = InMemoryCache(max_size_in_memory=MAX_IMGS_IN_MEMORY)
 
 def _process_image_response(response: Response, url: str) -> str:
     if response.status_code != 200:
-        raise Exception(
-            f"Error: Unable to fetch image from URL. Status code: {response.status_code}, url={url}"
-        )
+        raise Exception(f"Error: Unable to fetch image from URL. Status code: {response.status_code}, url={url}")
 
     image_bytes = response.content
     base64_image = base64.b64encode(image_bytes).decode("utf-8")
@@ -59,9 +57,7 @@ async def async_convert_url_to_base64(url: str) -> str:
             return _process_image_response(response, url)
         except Exception:
             pass
-    raise Exception(
-        f"Error: Unable to fetch image from URL after 3 attempts. url={url}"
-    )
+    raise Exception(f"Error: Unable to fetch image from URL after 3 attempts. url={url}")
 
 
 def convert_url_to_base64(url: str) -> str:
@@ -72,12 +68,13 @@ def convert_url_to_base64(url: str) -> str:
     client = litellm.module_level_client
     for _ in range(3):
         try:
-            response = client.get(url, follow_redirects=True)
+            response = client.get(
+                url,
+                follow_redirects=True,
+                headers={"User-Agent": "LiteLLM/1.0 (https://github.com/BerriAI/litellm)"},
+            )
             return _process_image_response(response, url)
         except Exception as e:
             verbose_logger.exception(e)
             # print(e)
-            pass
-    raise Exception(
-        f"Error: Unable to fetch image from URL after 3 attempts. url={url}"
-    )
+    raise Exception(f"Error: Unable to fetch image from URL after 3 attempts. url={url}")

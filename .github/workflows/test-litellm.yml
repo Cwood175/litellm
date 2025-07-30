@@ -1,8 +1,6 @@
 name: LiteLLM Mock Tests (folder - tests/test_litellm)
 
-on:
-  pull_request:
-    branches: [ main ]
+on: push
 
 jobs:
   test:

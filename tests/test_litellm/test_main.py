@@ -160,7 +160,7 @@ async def test_url_with_format_param(model, sync_mode, monkeypatch):
                     {
                         "type": "image_url",
                         "image_url": {
-                            "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/d/dd/Gfp-wisconsin-madison-the-nature-boardwalk.jpg/2560px-Gfp-wisconsin-madison-the-nature-boardwalk.jpg",
+                            "url": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=",
                             "format": "image/png",
                         },
                     },
@@ -176,8 +176,9 @@ async def test_url_with_format_param(model, sync_mode, monkeypatch):
             else:
                 response = await acompletion(**args, client=client)
             print(response)
-        except Exception as e:
-            pass
+        except Exception:
+            if not mock_client.called:
+                raise
 
         mock_client.assert_called()
 
