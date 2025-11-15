@@ -9,13 +9,13 @@ sys.path.insert(
     0, os.path.abspath("../../..")
 )  # Adds the parent directory to the system path
 
-from litellm.proxy._experimental.mcp_server.mcp_server_manager import (
+from litellm.proxy._experimental.mcp_server.mcp_server_manager import (  # noqa: E402
     MCPServerManager,
     MCPServer,
     MCPTransport,
 )
-from mcp.types import Tool as MCPTool, CallToolResult, ListToolsResult
-from mcp.types import TextContent
+from mcp.types import Tool as MCPTool, CallToolResult, ListToolsResult  # noqa: E402
+from mcp.types import TextContent  # noqa: E402
 
 
 mcp_server_manager = MCPServerManager()
@@ -632,7 +632,6 @@ def test_generate_stable_server_id():
 async def test_list_tools_rest_api_server_not_found():
     """Test the list_tools REST API when server is not found"""
     from litellm.proxy._experimental.mcp_server.rest_endpoints import list_tool_rest_api
-    from fastapi import Query
     from litellm.proxy._types import UserAPIKeyAuth
 
     # Mock UserAPIKeyAuth
@@ -662,7 +661,6 @@ async def test_list_tools_rest_api_success():
         list_tool_rest_api,
         global_mcp_server_manager,
     )
-    from fastapi import Query
     from litellm.proxy._types import UserAPIKeyAuth
 
     # Store original registry to restore after test

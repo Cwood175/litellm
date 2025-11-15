@@ -1357,7 +1357,7 @@ class TestMCPServerManager:
         Test that call_tool properly uses async context manager to avoid broken pipe errors.
         This test ensures that tasks are awaited INSIDE the context manager, keeping the connection alive.
         """
-        from unittest.mock import AsyncMock, MagicMock, patch
+        from unittest.mock import AsyncMock, MagicMock
 
         from mcp.types import CallToolResult
 
@@ -1374,7 +1374,9 @@ class TestMCPServerManager:
         # Register the server and map a tool to it
         manager.registry = {"test-server": server}
         manager.tool_name_to_mcp_server_name_mapping["test_tool"] = "test-server"
-        manager.tool_name_to_mcp_server_name_mapping["test-server-test_tool"] = "test-server"
+        manager.tool_name_to_mcp_server_name_mapping[
+            "test-server-test_tool"
+        ] = "test-server"
 
         # Create mock client that tracks context manager usage
         mock_client = MagicMock()
