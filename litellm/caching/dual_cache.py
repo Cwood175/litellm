@@ -200,7 +200,7 @@ class DualCache(BaseCache):
 
             if result is None and self.redis_cache is not None and local_only is False:
                 # If not found in in-memory cache, try fetching from Redis
-                redis_result: Final[object | None] = self.redis_cache.get_cache(key, parent_otel_span=parent_otel_span)
+                redis_result: Final = self.redis_cache.get_cache(key, parent_otel_span=parent_otel_span)
 
                 if redis_result is not None:
                     # Update in-memory cache with the value from Redis
@@ -281,9 +281,7 @@ class DualCache(BaseCache):
                 if request_batch is not None and request_batch.read_as_missing(key):
                     return None
                 # If not found in in-memory cache, try fetching from Redis
-                redis_result: Final[object | None] = await self.redis_cache.async_get_cache(
-                    key, parent_otel_span=parent_otel_span
-                )
+                redis_result: Final = await self.redis_cache.async_get_cache(key, parent_otel_span=parent_otel_span)
 
                 if redis_result is not None:
                     # Update in-memory cache with the value from Redis
