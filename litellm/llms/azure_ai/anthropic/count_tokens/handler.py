@@ -7,7 +7,7 @@ Uses httpx for HTTP requests with Azure authentication.
 from typing import Final
 
 import httpx
-from pydantic import JsonValue
+from pydantic import JsonValue, TypeAdapter
 
 import litellm
 from litellm._logging import verbose_logger
@@ -17,6 +17,8 @@ from litellm.llms.azure_ai.anthropic.count_tokens.transformation import (
     AzureAIAnthropicCountTokensConfig,
 )
 from litellm.llms.custom_httpx.http_handler import get_async_httpx_client
+
+_AZURE_COUNT_TOKENS_RESPONSE_ADAPTER: Final = TypeAdapter(dict[str, object])
 
 
 class AzureAIAnthropicCountTokensHandler(AzureAIAnthropicCountTokensConfig):
@@ -113,7 +115,7 @@ class AzureAIAnthropicCountTokensHandler(AzureAIAnthropicCountTokensConfig):
                     message=error_text,
                 )
 
-            azure_response: Final = response.json()
+            azure_response: Final = _AZURE_COUNT_TOKENS_RESPONSE_ADAPTER.validate_python(response.json(), strict=True)
 
             verbose_logger.debug("Azure AI Anthropic response: %s", azure_response)
 

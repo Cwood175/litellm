@@ -1,14 +1,16 @@
 import builtins
+import itertools
 import json
-from collections.abc import Mapping, Sequence
+from collections.abc import Iterator, Mapping, Sequence
 from datetime import datetime
-from typing import Any, Final, Literal, Protocol
+from typing import Final, Literal, Protocol
 
 import click
 import requests
 import rich
+from pydantic import ConfigDict, TypeAdapter, with_config
 from rich.table import Table
-from typing_extensions import ReadOnly, TypedDict
+from typing_extensions import NotRequired, ReadOnly, TypedDict
 
 from ...keys import KeysManagementClient
 
@@ -31,6 +33,38 @@ class _KeyRowsView(TypedDict):
 
 class _JsonBodyView(TypedDict):
     body: ReadOnly[object]
+
+
+@with_config(ConfigDict(strict=True, extra="allow"))
+class _SourceKey(TypedDict, total=False):
+    created_at: NotRequired[ReadOnly[object]]
+    key_alias: NotRequired[ReadOnly[str | None]]
+    user_id: NotRequired[ReadOnly[str | None]]
+    team_id: NotRequired[ReadOnly[str | None]]
+    budget_id: NotRequired[ReadOnly[str | None]]
+    models: NotRequired[ReadOnly[Sequence[str] | None]]
+    aliases: NotRequired[ReadOnly[Mapping[str, str] | None]]
+    spend: NotRequired[ReadOnly[int | float | None]]
+    config: NotRequired[ReadOnly[Mapping[str, object] | None]]
+
+
+@with_config(ConfigDict(strict=True, extra="allow"))
+class _KeysPage(TypedDict, total=False):
+    keys: NotRequired[ReadOnly[Sequence[_SourceKey]]]
+
+
+class _KeyImportData(TypedDict, total=False):
+    models: NotRequired[ReadOnly[builtins.list[str]]]
+    aliases: NotRequired[ReadOnly[dict[str, str]]]
+    spend: NotRequired[ReadOnly[float]]
+    key_alias: NotRequired[ReadOnly[str]]
+    team_id: NotRequired[ReadOnly[str]]
+    user_id: NotRequired[ReadOnly[str]]
+    budget_id: NotRequired[ReadOnly[str]]
+    config: NotRequired[ReadOnly[Mapping[str, object]]]
+
+
+_KEYS_PAGE_ADAPTER: Final = TypeAdapter(_KeysPage)
 
 
 def _cli_context(view: _CliContextView) -> _CliContext:
@@ -218,26 +252,20 @@ def _parse_created_since_filter(created_since: str | None) -> datetime | None:
         raise click.Abort()
 
 
-def _fetch_all_keys_with_pagination(
-    source_client: KeysManagementClient, source_base_url: str
-) -> Sequence[Mapping[str, object]]:
-    """Fetch all keys from source instance using pagination."""
-    click.echo(f"Fetching keys from source server: {source_base_url}")
-    source_keys: Final[builtins.list[Mapping[str, object]]] = []
+def _iter_key_pages(source_client: KeysManagementClient, page_size: int) -> Iterator[Sequence[_SourceKey]]:
     page = 1
-    page_size: Final = 100  # Use a larger page size to minimize API calls
-
     while True:
         source_response = source_client.list(return_full_object=True, page=page, size=page_size)
         # source_client.list() returns Dict[str, Any] when return_request is False (default)
         assert isinstance(source_response, dict), "Expected dict response from list API"
-        page_keys: Sequence[Mapping[str, object]] = source_response.get("keys", [])
+        validated_response = _KEYS_PAGE_ADAPTER.validate_python(source_response, strict=True)
+        page_keys: Sequence[_SourceKey] = validated_response.get("keys", [])
 
         if not page_keys:
             break
 
-        source_keys.extend(page_keys)
         click.echo(f"Fetched page {page}: {len(page_keys)} keys")
+        yield page_keys
 
         # Check if we got fewer keys than the page size, indicating last page
         if len(page_keys) < page_size:
@@ -245,41 +273,48 @@ def _fetch_all_keys_with_pagination(
 
         page += 1
 
+
+def _fetch_all_keys_with_pagination(source_client: KeysManagementClient, source_base_url: str) -> Sequence[_SourceKey]:
+    """Fetch all keys from source instance using pagination."""
+    click.echo(f"Fetching keys from source server: {source_base_url}")
+    page_size: Final = 100  # Use a larger page size to minimize API calls
+    source_keys: Final = tuple(itertools.chain.from_iterable(_iter_key_pages(source_client, page_size)))
     return source_keys
 
 
+def _created_on_or_after(key: _SourceKey, created_since_dt: datetime) -> bool:
+    key_created_at: Final = key.get("created_at")
+    if not key_created_at:
+        return False
+    # Parse the key's created_at timestamp
+    if not isinstance(key_created_at, str):
+        return False
+    key_dt: Final = datetime.fromisoformat(
+        key_created_at.replace("Z", "+00:00") if "T" in key_created_at else key_created_at
+    )
+
+    # Convert to naive datetime for comparison (assuming UTC)
+    comparable_key_dt: Final = key_dt.replace(tzinfo=None) if key_dt.tzinfo else key_dt
+
+    return comparable_key_dt >= created_since_dt
+
+
 def _filter_keys_by_created_since(
-    source_keys: Sequence[Mapping[str, object]],
+    source_keys: Sequence[_SourceKey],
     created_since_dt: datetime | None,
     created_since: str,
-) -> Sequence[Mapping[str, object]]:
+) -> Sequence[_SourceKey]:
     """Filter keys by created_since date if specified."""
     if not created_since_dt:
         return source_keys
 
-    filtered_keys: Final[builtins.list[Mapping[str, object]]] = []
-    for key in source_keys:
-        key_created_at = key.get("created_at")
-        if key_created_at:
-            # Parse the key's created_at timestamp
-            if isinstance(key_created_at, str):
-                if "T" in key_created_at:
-                    key_dt = datetime.fromisoformat(key_created_at.replace("Z", "+00:00"))
-                else:
-                    key_dt = datetime.fromisoformat(key_created_at)
-
-                # Convert to naive datetime for comparison (assuming UTC)
-                if key_dt.tzinfo:
-                    key_dt = key_dt.replace(tzinfo=None)
-
-                if key_dt >= created_since_dt:
-                    filtered_keys.append(key)
+    filtered_keys: Final = tuple(key for key in source_keys if _created_on_or_after(key, created_since_dt))
 
     click.echo(f"Filtered {len(source_keys)} keys to {len(filtered_keys)} keys created since {created_since}")
     return filtered_keys
 
 
-def _display_dry_run_table(source_keys: Sequence[Mapping[str, object]]) -> None:
+def _display_dry_run_table(source_keys: Sequence[_SourceKey]) -> None:
     """Display a table of keys that would be imported in dry-run mode."""
     click.echo("\n--- DRY RUN MODE ---")
     table: Final = Table(title="Keys that would be imported")
@@ -302,29 +337,39 @@ def _display_dry_run_table(source_keys: Sequence[Mapping[str, object]]) -> None:
     rich.print(table)
 
 
-def _prepare_key_import_data(key: Mapping[str, object]) -> dict[str, Any]:
+def _prepare_key_import_data(key: _SourceKey) -> _KeyImportData:
     """Prepare key data for import by extracting relevant fields."""
-    import_data: Final = {}
-
     # Copy relevant fields if they exist
-    for field in [
-        "models",
-        "aliases",
-        "spend",
-        "key_alias",
-        "team_id",
-        "user_id",
-        "budget_id",
-        "config",
-    ]:
-        if key.get(field):
-            import_data[field] = key[field]
-
-    return import_data
+    models: Final = key.get("models")
+    models_part: Final[_KeyImportData] = {"models": builtins.list(models)} if models else {}
+    aliases: Final = key.get("aliases")
+    aliases_part: Final[_KeyImportData] = {"aliases": dict(aliases)} if aliases else {}
+    spend: Final = key.get("spend")
+    spend_part: Final[_KeyImportData] = {"spend": spend} if spend else {}
+    key_alias: Final = key.get("key_alias")
+    key_alias_part: Final[_KeyImportData] = {"key_alias": key_alias} if key_alias else {}
+    team_id: Final = key.get("team_id")
+    team_id_part: Final[_KeyImportData] = {"team_id": team_id} if team_id else {}
+    user_id: Final = key.get("user_id")
+    user_id_part: Final[_KeyImportData] = {"user_id": user_id} if user_id else {}
+    budget_id: Final = key.get("budget_id")
+    budget_id_part: Final[_KeyImportData] = {"budget_id": budget_id} if budget_id else {}
+    config: Final = key.get("config")
+    config_part: Final[_KeyImportData] = {"config": config} if config else {}
+    return {
+        **models_part,
+        **aliases_part,
+        **spend_part,
+        **key_alias_part,
+        **team_id_part,
+        **user_id_part,
+        **budget_id_part,
+        **config_part,
+    }
 
 
 def _import_keys_to_destination(
-    source_keys: Sequence[Mapping[str, object]], dest_client: KeysManagementClient
+    source_keys: Sequence[_SourceKey], dest_client: KeysManagementClient
 ) -> tuple[int, int]:
     """Import each key to the destination instance and return counts."""
     imported_count = 0
@@ -387,11 +432,14 @@ def import_keys(
 
     try:
         # Get all keys from source instance with pagination
-        source_keys = _fetch_all_keys_with_pagination(source_client, source_base_url)
+        source_keys: Sequence[_SourceKey] = _fetch_all_keys_with_pagination(source_client, source_base_url)
 
         # Filter keys by created_since if specified
         if created_since:
-            source_keys = _filter_keys_by_created_since(source_keys, created_since_dt, created_since)
+            filtered_keys: Final[Sequence[_SourceKey]] = _filter_keys_by_created_since(
+                source_keys, created_since_dt, created_since
+            )
+            source_keys = filtered_keys
 
         if not source_keys:
             click.echo("No keys found in source instance.")
