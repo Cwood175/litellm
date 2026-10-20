@@ -36,8 +36,8 @@ if TYPE_CHECKING:
 import dotenv
 import httpx
 import openai
-from pydantic import BaseModel, ConfigDict, TypeAdapter, ValidationError, with_config
-from typing_extensions import ReadOnly, TypedDict, assert_never, overload
+from pydantic import BaseModel, TypeAdapter, ValidationError
+from typing_extensions import assert_never, overload
 
 import litellm
 
@@ -5005,21 +5005,8 @@ def _complete_ovhcloud(ctx: CompletionDispatchContext) -> _CompletionDispatchRes
     return response
 
 
-@with_config(ConfigDict(extra="allow", strict=True))
-class _CustomApiDatum(TypedDict):
-    output: ReadOnly[Sequence[str]]
-
-
-@with_config(ConfigDict(extra="allow", strict=True))
-class _CustomApiResponse(TypedDict):
-    data: ReadOnly[Sequence[_CustomApiDatum]]
-
-
-_CUSTOM_API_RESPONSE: Final = TypeAdapter(_CustomApiResponse)
-
-
 def _custom_api_first_output(resp: httpx.Response | None) -> str:
-    return _CUSTOM_API_RESPONSE.validate_python(resp.json())["data"][0]["output"][0]
+    return resp.json()["data"][0]["output"][0]
 
 
 def _complete_custom(ctx: CompletionDispatchContext) -> _CompletionDispatchResult:
