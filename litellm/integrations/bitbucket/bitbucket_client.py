@@ -7,25 +7,30 @@ import urllib.parse
 from collections.abc import Mapping
 from typing import Final, TypedDict
 
+from pydantic import ConfigDict, TypeAdapter, with_config
 from typing_extensions import NotRequired, ReadOnly
 
 from litellm.llms.custom_httpx.http_handler import HTTPHandler
 
 
+@with_config(ConfigDict(extra="allow", strict=True))
 class BitBucketSrcEntry(TypedDict):
     path: ReadOnly[NotRequired[str]]
     type: ReadOnly[NotRequired[str]]
 
 
+@with_config(ConfigDict(extra="allow", strict=True))
 class BitBucketSrcListing(TypedDict):
     values: ReadOnly[NotRequired[list[BitBucketSrcEntry]]]
 
 
+@with_config(ConfigDict(extra="allow", strict=True))
 class BitBucketBranch(TypedDict):
     name: ReadOnly[NotRequired[str]]
     type: ReadOnly[NotRequired[str]]
 
 
+@with_config(ConfigDict(extra="allow", strict=True))
 class BitBucketBranchListing(TypedDict):
     values: ReadOnly[NotRequired[list[BitBucketBranch]]]
 
@@ -34,6 +39,11 @@ class BitBucketFileMetadata(TypedDict):
     content_type: ReadOnly[str | None]
     content_length: ReadOnly[str | None]
     last_modified: ReadOnly[str | None]
+
+
+_SRC_LISTING: Final = TypeAdapter(BitBucketSrcListing)
+_BRANCH_LISTING: Final = TypeAdapter(BitBucketBranchListing)
+_REPOSITORY_INFO: Final = TypeAdapter(Mapping[str, object], config=ConfigDict(strict=True))
 
 
 def _sanitize_file_path(file_path: str) -> str:
@@ -166,7 +176,7 @@ class BitBucketClient:
             response: Final = self.http_handler.get(url, headers=self.headers)
             response.raise_for_status()
 
-            data: Final[BitBucketSrcListing] = response.json()
+            data: Final[BitBucketSrcListing] = _SRC_LISTING.validate_python(response.json())
             return [
                 file_path
                 for item in data.get("values", [])
@@ -201,7 +211,7 @@ class BitBucketClient:
         try:
             response: Final = self.http_handler.get(url, headers=self.headers)
             response.raise_for_status()
-            return response.json()
+            return _REPOSITORY_INFO.validate_python(response.json())
         except Exception as e:
             raise Exception(f"Failed to get repository info: {e}")
 
@@ -231,7 +241,7 @@ class BitBucketClient:
             response: Final = self.http_handler.get(url, headers=self.headers)
             response.raise_for_status()
 
-            data: Final[BitBucketBranchListing] = response.json()
+            data: Final[BitBucketBranchListing] = _BRANCH_LISTING.validate_python(response.json())
             return data.get("values", [])
         except Exception as e:
             raise Exception(f"Failed to get branches: {e}")
