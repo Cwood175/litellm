@@ -3,7 +3,7 @@ DeepSeek Anthropic-compatible messages transformation config.
 """
 
 from collections.abc import Sequence
-from typing import Final
+from typing import Any, Final
 
 import litellm
 from litellm.llms.anthropic.pass_through.messages.transformation import (
@@ -95,7 +95,7 @@ class DeepSeekAnthropicMessagesConfig(AnthropicMessagesConfig):
         return f"{base_url}/v1/messages"
 
     @staticmethod
-    def _sanitize_tools_for_deepseek(tools: object) -> object:
+    def _sanitize_tools_for_deepseek(tools: Any) -> object:
         if not isinstance(tools, list):
             return tools
 
