@@ -8,10 +8,10 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from threading import Lock
-from typing import Any, Final, Protocol
+from typing import Final, Protocol
 
 import httpx
-from pydantic import TypeAdapter
+from pydantic import ConfigDict, TypeAdapter
 from typing_extensions import NotRequired, ReadOnly, TypedDict
 
 import litellm
@@ -31,6 +31,9 @@ SERVICE_KEY_ENV_VAR: Final = "AICORE_SERVICE_KEY"
 DEFAULT_HOME_PATH: Final = os.path.join(os.path.expanduser("~"), ".aicore")
 
 _DECODED_JSON: Final = TypeAdapter(object)
+_VCAP_SERVICES: Final = TypeAdapter(
+    Mapping[str, Sequence[Mapping[str, object]]], config=ConfigDict(strict=True, hide_input_in_errors=True)
+)
 
 
 def _get_home() -> str:
@@ -58,12 +61,12 @@ def _get_nested(d: object, path: Sequence[str]) -> object:
     return cur
 
 
-def _load_json_env(var_name: str) -> dict[str, object] | None:
+def _load_json_env(var_name: str) -> object:
     raw: Final = os.environ.get(var_name)
     if not raw:
         return None
     try:
-        return json.loads(raw)
+        return _DECODED_JSON.validate_python(json.loads(raw))
     except json.JSONDecodeError:
         return None
 
@@ -75,8 +78,8 @@ def _str_or_none(value: object) -> str | None:
         return None
 
 
-def _load_vcap() -> dict[str, Any]:
-    return _load_json_env(VCAP_SERVICES_ENV_VAR) or {}
+def _load_vcap() -> Mapping[str, Sequence[Mapping[str, object]]]:
+    return _VCAP_SERVICES.validate_python(_load_json_env(VCAP_SERVICES_ENV_VAR) or {})
 
 
 def _get_vcap_service(label: str) -> Mapping[str, object] | None:
