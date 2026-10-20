@@ -8,10 +8,11 @@ import json
 import re
 from collections.abc import Callable, Mapping
 from types import MappingProxyType
-from typing import TYPE_CHECKING, Any, Final, Literal, Union, cast
+from typing import TYPE_CHECKING, Any, Final, Literal, TypedDict, Union, cast
 
 import httpx
-from pydantic import TypeAdapter
+from pydantic import ConfigDict, TypeAdapter, with_config
+from typing_extensions import ReadOnly
 
 import litellm
 import litellm.litellm_core_utils
@@ -83,6 +84,48 @@ def _loads_stream_chunk(payload: str) -> dict[str, object]:
 
 
 _DECODED_JSON: Final = TypeAdapter(object)
+
+
+@with_config(ConfigDict(extra="allow", strict=True))
+class _CodeInterpreterToolResult(TypedDict, total=False):
+    type: ReadOnly[Literal["bash_code_execution_tool_result"]]
+    tool_use_id: ReadOnly[str]
+    content: ReadOnly[object]
+
+
+@with_config(ConfigDict(extra="allow", strict=True))
+class _CodeInterpreterToolInput(TypedDict, total=False):
+    command: ReadOnly[str]
+
+
+_CODE_INTERPRETER_TOOL_RESULT: Final = TypeAdapter(_CodeInterpreterToolResult)
+_CODE_INTERPRETER_TOOL_INPUT: Final = TypeAdapter(_CodeInterpreterToolInput)
+
+
+def _code_interpreter_result(
+    tool_result: Mapping[str, object],
+    server_tool_inputs: Mapping[str, object],
+    container_id: str | None,
+) -> OutputCodeInterpreterCall | None:
+    if tool_result.get("type") != "bash_code_execution_tool_result":
+        return None
+    validated_tool_result: Final = _CODE_INTERPRETER_TOOL_RESULT.validate_python(tool_result)
+    call_id: Final = validated_tool_result.get("tool_use_id", "")
+    content: Final = validated_tool_result.get("content", {})
+    log_outputs: Final = build_code_interpreter_log_outputs(content)
+    raw_tool_input: Final = server_tool_inputs.get(call_id, {})
+    tool_input: Final = (
+        _CODE_INTERPRETER_TOOL_INPUT.validate_python(raw_tool_input) if isinstance(raw_tool_input, dict) else {}
+    )
+    code: Final = tool_input.get("command", "")
+    return OutputCodeInterpreterCall(
+        type="code_interpreter_call",
+        id=call_id,
+        code=code,
+        container_id=container_id,
+        status="completed",
+        outputs=log_outputs,
+    )
 
 
 _EnvelopeVerdict = Literal["undecided", "pass_through", "hold"]
@@ -740,7 +783,7 @@ class ModelResponseIterator:
 
         # Track server tool use inputs and results for code_interpreter_results
         self._server_tool_inputs: dict[str, object] = {}
-        self.tool_results: list[dict[str, Any]] = []
+        self.tool_results: list[Mapping[str, object]] = []
         self._current_server_tool_id: str | None = None
         self._container_id: str | None = None
 
@@ -926,25 +969,11 @@ class ModelResponseIterator:
         wins" for list-valued provider_specific_fields keys, so the last
         emission must contain every result.
         """
-        results: Final = []
-        for tr in self.tool_results:
-            if tr.get("type") != "bash_code_execution_tool_result":
-                continue
-            call_id = tr.get("tool_use_id", "")
-            content = tr.get("content", {})
-            log_outputs = build_code_interpreter_log_outputs(content)
-            tool_input = self._server_tool_inputs.get(call_id, {})
-            code = tool_input.get("command", "") if isinstance(tool_input, dict) else ""
-            results.append(
-                OutputCodeInterpreterCall(
-                    type="code_interpreter_call",
-                    id=call_id,
-                    code=code,
-                    container_id=self._container_id,
-                    status="completed",
-                    outputs=log_outputs,
-                )
-            )
+        results: Final = [
+            result
+            for tr in self.tool_results
+            if (result := _code_interpreter_result(tr, self._server_tool_inputs, self._container_id)) is not None
+        ]
         return results
 
     def chunk_parser(self, chunk: dict) -> ModelResponseStream:
