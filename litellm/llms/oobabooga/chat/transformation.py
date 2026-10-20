@@ -1,7 +1,10 @@
 import time
+from collections.abc import Sequence
 from typing import TYPE_CHECKING, Any, Final
 
 import httpx
+from pydantic import ConfigDict, TypeAdapter, with_config
+from typing_extensions import ReadOnly, TypedDict
 
 from litellm.llms.base_llm.chat.transformation import BaseLLMException
 from litellm.llms.openai.chat.gpt_transformation import OpenAIGPTConfig
@@ -17,6 +20,35 @@ if TYPE_CHECKING:
     LoggingClass = LiteLLMLoggingObj
 else:
     LoggingClass = Any
+
+
+_PROVIDER_JSON_CONFIG: Final = ConfigDict(extra="allow", strict=True, hide_input_in_errors=True)
+
+
+@with_config(_PROVIDER_JSON_CONFIG)
+class _OobaboogaMessage(TypedDict):
+    content: ReadOnly[str | None]
+
+
+@with_config(_PROVIDER_JSON_CONFIG)
+class _OobaboogaChoice(TypedDict):
+    message: ReadOnly[_OobaboogaMessage]
+
+
+@with_config(_PROVIDER_JSON_CONFIG)
+class _OobaboogaUsage(TypedDict):
+    prompt_tokens: ReadOnly[int]
+    completion_tokens: ReadOnly[int]
+    total_tokens: ReadOnly[int]
+
+
+@with_config(_PROVIDER_JSON_CONFIG)
+class _OobaboogaSuccessResponse(TypedDict):
+    choices: ReadOnly[Sequence[_OobaboogaChoice]]
+    usage: ReadOnly[_OobaboogaUsage]
+
+
+_OOBABOOGA_SUCCESS_RESPONSE: Final = TypeAdapter(_OobaboogaSuccessResponse)
 
 
 class OobaboogaConfig(OpenAIGPTConfig):
@@ -62,7 +94,8 @@ class OobaboogaConfig(OpenAIGPTConfig):
             )
         else:
             try:
-                model_response.choices[0].message.content = completion_response["choices"][0]["message"]["content"]
+                success_response: Final = _OOBABOOGA_SUCCESS_RESPONSE.validate_python(completion_response)
+                model_response.choices[0].message.content = success_response["choices"][0]["message"]["content"]
             except Exception as e:
                 raise OobaboogaError(
                     message=str(e),
@@ -72,9 +105,9 @@ class OobaboogaConfig(OpenAIGPTConfig):
         model_response.created = int(time.time())
         model_response.model = model
         usage: Final = Usage(
-            prompt_tokens=completion_response["usage"]["prompt_tokens"],
-            completion_tokens=completion_response["usage"]["completion_tokens"],
-            total_tokens=completion_response["usage"]["total_tokens"],
+            prompt_tokens=success_response["usage"]["prompt_tokens"],
+            completion_tokens=success_response["usage"]["completion_tokens"],
+            total_tokens=success_response["usage"]["total_tokens"],
         )
         setattr(model_response, "usage", usage)
         return model_response
