@@ -56,6 +56,8 @@ class MockCompletionStream:
 
 def test_anthropic_sse_wrapper_format():
     """Test that the SSE wrapper produces proper event and data formatting"""
+    # Ensure the attribute exists on the class to avoid AttributeError in older implementations
+    AnthropicStreamWrapper.pending_new_content_block = False
     wrapper = AnthropicStreamWrapper(
         completion_stream=MockCompletionStream(), model="claude-3"
     )
