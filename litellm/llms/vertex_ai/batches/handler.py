@@ -117,13 +117,26 @@ class VertexAIBatchPrediction(VertexLLM):
         )
         return vertex_batch_response
 
+    @staticmethod
     def create_vertex_url(
-        self,
         vertex_location: str,
         vertex_project: str,
+        partner=None,
+        stream=None,
+        model=None,
+        api_base=None,
     ) -> str:
-        """Return the base url for the vertex garden models"""
-        #  POST https://LOCATION-aiplatform.googleapis.com/v1/projects/PROJECT_ID/locations/LOCATION/batchPredictionJobs
+        """Return the base url for the vertex garden models
+
+        Signature matches the VertexBase staticmethod, accepting optional
+        partner, stream, model and api_base parameters. If api_base is
+        provided it is used as the base URL; otherwise the default
+        location-specific Vertex AI endpoint is returned.
+        """
+        # POST https://LOCATION-aiplatform.googleapis.com/v1/projects/PROJECT_ID/locations/LOCATION/batchPredictionJobs
+        if api_base:
+            base = api_base.rstrip('/')
+            return f"{base}/v1/projects/{vertex_project}/locations/{vertex_location}/batchPredictionJobs"
         return f"https://{vertex_location}-aiplatform.googleapis.com/v1/projects/{vertex_project}/locations/{vertex_location}/batchPredictionJobs"
 
     def retrieve_batch(
