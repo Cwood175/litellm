@@ -4,7 +4,6 @@ Ollama /chat/completion calls handled in llm_http_handler.py
 [TODO]: migrate embeddings to a base handler as well.
 """
 
-import asyncio
 from typing import Any, Dict, List
 
 import litellm
@@ -58,9 +57,7 @@ async def ollama_aembeddings(
     for idx, emb in enumerate(embeddings):
         output_data.append({"object": "embedding", "index": idx, "embedding": emb})
 
-    input_tokens = response_json.get("prompt_eval_count") or len(
-        encoding.encode("".join(prompt for prompt in prompts))
-    )
+    input_tokens = response_json.get("prompt_eval_count") or len(encoding.encode("".join(prompt for prompt in prompts)))
     total_input_tokens += input_tokens
 
     model_response.object = "list"
@@ -116,7 +113,7 @@ def ollama_embeddings(
     total_input_tokens = 0
     output_data = []
 
-    response =  litellm.module_level_client.post(url=url, json=data)
+    response = litellm.module_level_client.post(url=url, json=data)
 
     response_json = response.json()
 
@@ -124,9 +121,7 @@ def ollama_embeddings(
     for idx, emb in enumerate(embeddings):
         output_data.append({"object": "embedding", "index": idx, "embedding": emb})
 
-    input_tokens = response_json.get("prompt_eval_count") or len(
-        encoding.encode("".join(prompt for prompt in prompts))
-    )
+    input_tokens = response_json.get("prompt_eval_count") or len(encoding.encode("".join(prompt for prompt in prompts)))
     total_input_tokens += input_tokens
 
     model_response.object = "list"
