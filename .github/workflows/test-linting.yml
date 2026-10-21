@@ -1,8 +1,6 @@
 name: LiteLLM Linting
 
-on:
-  pull_request:
-    branches: [ main ]
+on: push
 
 jobs:
   lint:
@@ -53,5 +51,5 @@ jobs:
         cd ..
 
     - name: Check import safety
-      run: |
+      run: |-
         poetry run python -c "from litellm import *" || (echo '🚨 import failed, this means you introduced unprotected imports! 🚨'; exit 1)
