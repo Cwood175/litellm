@@ -36,15 +36,47 @@ MOCK_DB_GUARDRAIL = {
     "updated_at": datetime.now(),
 }
 
+# Small helper model-like wrappers used in tests so mocked objects
+# provide a `model_dump` method similar to Pydantic/BaseModel instances.
+class _SimpleModel:
+    def __init__(self, data):
+        self._data = data
+
+    def model_dump(self):
+        return self._data
+
+
+class _GuardrailModel:
+    def __init__(self, data):
+        # keep the original dict but allow model-like behavior
+        self._data = dict(data)
+
+    def model_dump(self):
+        # ensure nested litellm_params uses its model_dump if available
+        data = dict(self._data)
+        lp = data.get("litellm_params")
+        if hasattr(lp, "model_dump"):
+            data["litellm_params"] = lp.model_dump()
+        return data
+
+    def __getattr__(self, name):
+        if name in self._data:
+            return self._data[name]
+        raise AttributeError(name)
+
+
 MOCK_CONFIG_GUARDRAIL = {
     "guardrail_id": "test-config-guardrail",
     "guardrail_name": "Test Config Guardrail",
-    "litellm_params": {
+    "litellm_params": _SimpleModel({
         "guardrail": "custom_guardrail.myCustomGuardrail",
         "mode": "during_call",
-    },
+    }),
     "guardrail_info": {"description": "Test guardrail from config"},
 }
+
+# expose a model-like object for tests that expect model_dump/attributes
+MOCK_CONFIG_GUARDRAIL = _GuardrailModel(MOCK_CONFIG_GUARDRAIL)
 
 
 @pytest.fixture
@@ -54,11 +86,12 @@ def mock_prisma_client(mocker):
     # Create async mocks for the database methods
     mock_client.db = mocker.Mock()
     mock_client.db.litellm_guardrailstable = mocker.Mock()
+    # Return model-like objects from the prisma mock so code can call model_dump
     mock_client.db.litellm_guardrailstable.find_many = AsyncMock(
-        return_value=[MOCK_DB_GUARDRAIL]
+        return_value=[_GuardrailModel(MOCK_DB_GUARDRAIL)]
     )
     mock_client.db.litellm_guardrailstable.find_unique = AsyncMock(
-        return_value=MOCK_DB_GUARDRAIL
+        return_value=_GuardrailModel(MOCK_DB_GUARDRAIL)
     )
     return mock_client
 
