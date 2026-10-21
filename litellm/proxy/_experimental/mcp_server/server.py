@@ -287,18 +287,18 @@ if MCP_AVAILABLE:
         if mcp_servers is not None:
             # Convert to lowercase for case-insensitive comparison
             mcp_servers_lower = [s.lower() for s in mcp_servers]
-            allowed_mcp_servers = [
-                server_id
-                for server_id in allowed_mcp_servers
-                if any(
-                    server_alias.lower() in mcp_servers_lower
-                    for server_alias in [
-                        global_mcp_server_manager.get_mcp_server_by_id(server_id).alias,
-                        global_mcp_server_manager.get_mcp_server_by_id(server_id).server_name,
-                        server_id,
-                    ]
-                    if server_alias is not None
-                )
+            new_allowed_mcp_servers = []
+            for server_id in allowed_mcp_servers:
+                server = global_mcp_server_manager.get_mcp_server_by_id(server_id)
+                # Build a list of aliases to check, including the raw server_id
+                aliases = [server_id]
+                if server is not None:
+                    aliases.insert(0, server.server_name)
+                    aliases.insert(0, server.alias)
+                # Check any alias (that is not None) appears in mcp_servers_lower
+                if any(alias is not None and alias.lower() in mcp_servers_lower for alias in aliases):
+                    new_allowed_mcp_servers.append(server_id)
+            allowed_mcp_servers = new_allowed_mcp_servers
             ]
 
         # Get tools from each allowed server
