@@ -158,12 +158,15 @@ class OnyxGuardrail(CustomGuardrail):
         """
         Validate LLM response before returning to client
         """
+        from typing import Any
+
         verbose_proxy_logger.info("Running post-call guard hook")
 
         conversation_id = self._handle_conversation_id(data)
 
         try:
-            # Convert response to dict format for validation
+            # Convert response to a loosely-typed payload for validation
+            payload: Any
             if isinstance(response, dict):
                 # TypedDict or plain dict
                 payload = response
@@ -173,6 +176,14 @@ class OnyxGuardrail(CustomGuardrail):
             else:
                 # Fallback: use the response as-is
                 payload = response
+
+            # If payload is still a pydantic-like object, try to convert to dict
+            if hasattr(payload, "model_dump"):
+                try:
+                    payload = payload.model_dump()
+                except Exception:
+                    # If conversion fails, continue with the current payload
+                    pass
 
             await self._validate_with_guard_server(
                 payload=payload,
