@@ -170,14 +170,11 @@ async def test_url_with_format_param(model, sync_mode, monkeypatch):
         ],
     }
     with patch.object(client, "post", new=MagicMock()) as mock_client:
-        try:
-            if sync_mode:
-                response = completion(**args, client=client)
-            else:
-                response = await acompletion(**args, client=client)
-            print(response)
-        except Exception as e:
-            pass
+        if sync_mode:
+            response = completion(**args, client=client)
+        else:
+            response = await acompletion(**args, client=client)
+        print(response)
 
         mock_client.assert_called()
 
@@ -230,14 +227,11 @@ async def test_url_with_format_param_openai(model, sync_mode):
     with patch.object(
         client.chat.completions.with_raw_response, "create"
     ) as mock_client:
-        try:
-            if sync_mode:
-                response = completion(**args, client=client)
-            else:
-                response = await acompletion(**args, client=client)
-            print(response)
-        except Exception as e:
-            print(e)
+        if sync_mode:
+            response = completion(**args, client=client)
+        else:
+            response = await acompletion(**args, client=client)
+        print(response)
 
         mock_client.assert_called()
 

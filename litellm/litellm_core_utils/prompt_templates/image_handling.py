@@ -16,10 +16,18 @@ in_memory_cache = InMemoryCache(max_size_in_memory=MAX_IMGS_IN_MEMORY)
 
 
 def _process_image_response(response: Response, url: str) -> str:
-    if response.status_code != 200:
-        raise Exception(
-            f"Error: Unable to fetch image from URL. Status code: {response.status_code}, url={url}"
-        )
+    try:
+        # If the response object provides raise_for_status, use it so a specific HTTP error is raised
+        if hasattr(response, "status_code") and response.status_code != 200:
+            if hasattr(response, "raise_for_status"):
+                response.raise_for_status()
+            else:
+                raise RuntimeError(
+                    f"Error: Unable to fetch image from URL. Status code: {getattr(response, 'status_code', None)}, url={url}"
+                )
+    except Exception:
+        # Re-raise so callers and retry logic can handle the specific exception
+        raise
 
     image_bytes = response.content
     base64_image = base64.b64encode(image_bytes).decode("utf-8")
@@ -35,8 +43,8 @@ def _process_image_response(response: Response, url: str) -> str:
             "webp": "image/webp",
         }.get(img_type)
         if _img_type is None:
-            raise Exception(
-                f"Error: Unsupported image format. Format={_img_type}. Supported types = ['image/jpeg', 'image/png', 'image/gif', 'image/webp']"
+            raise ValueError(
+                f"Error: Unsupported image format. Format={img_type}. Supported types = ['image/jpeg', 'image/png', 'image/gif', 'image/webp']"
             )
         img_type = _img_type
     else:
@@ -59,9 +67,7 @@ async def async_convert_url_to_base64(url: str) -> str:
             return _process_image_response(response, url)
         except Exception:
             pass
-    raise Exception(
-        f"Error: Unable to fetch image from URL after 3 attempts. url={url}"
-    )
+    raise Exception(f"Error: Unable to fetch image from URL after 3 attempts. url={url}")
 
 
 def convert_url_to_base64(url: str) -> str:
@@ -70,14 +76,19 @@ def convert_url_to_base64(url: str) -> str:
         return cached_result
 
     client = litellm.module_level_client
+    import asyncio
+
     for _ in range(3):
         try:
-            response = client.get(url, follow_redirects=True)
+            resp = client.get(url, follow_redirects=True)
+            # If client.get returned a coroutine (async client), run it to obtain the response
+            if asyncio.iscoroutine(resp):
+                response = asyncio.run(resp)
+            else:
+                response = resp
             return _process_image_response(response, url)
         except Exception as e:
             verbose_logger.exception(e)
             # print(e)
             pass
-    raise Exception(
-        f"Error: Unable to fetch image from URL after 3 attempts. url={url}"
-    )
+    raise Exception(f"Error: Unable to fetch image from URL after 3 attempts. url={url}")
