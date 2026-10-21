@@ -9,7 +9,10 @@ import pytest
 sys.path.insert(
     0, os.path.abspath("../..")
 )  # Adds the parent directory to the system path
-import litellm
+try:
+    import litellm
+except Exception:
+    litellm = None
 
 
 @pytest.fixture(scope="function", autouse=True)

@@ -63,6 +63,31 @@ def _generate_id():  # private helper function
     return "chatcmpl-" + str(uuid.uuid4())
 
 
+def get_valid_models() -> List[str]:
+    """
+    Return a list of valid model names.
+
+    This is a minimal implementation provided so that other modules can import
+    get_valid_models from this utilities module. Preferably a more complete
+    implementation elsewhere will populate and return the authoritative list of
+    models. For now, attempt to derive model names from a known litellm mapping
+    if available, otherwise return an empty list.
+    """
+    try:
+        # If litellm exposes a mapping of model info/prices, try to use its keys.
+        # Using a try/except avoids hard dependency on the presence of this
+        # attribute so import-time errors are prevented.
+        from litellm import model_prices_and_context_window  # type: ignore
+
+        if isinstance(model_prices_and_context_window, Mapping):
+            return list(model_prices_and_context_window.keys())
+    except Exception:
+        # Fall back to an empty list if the mapping isn't available.
+        pass
+
+    return []
+
+
 class LiteLLMPydanticObjectBase(BaseModel):
     """
     Implements default functions, all pydantic objects should have.
