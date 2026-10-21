@@ -582,7 +582,7 @@ class TestMCPCustomHeaderName:
 
             with patch(
                 "litellm.proxy._experimental.mcp_server.auth.user_api_key_auth_mcp.user_api_key_auth",
-                side_effect=mock_user_api_key_auth,
+                new=AsyncMock(side_effect=mock_user_api_key_auth),
             ) as mock_auth:
                 # Call the method
                 auth_result, mcp_auth_header, mcp_servers, mcp_server_auth_headers, mcp_protocol_version = await MCPRequestHandler.process_mcp_request(scope)
@@ -740,7 +740,7 @@ class TestMCPAccessGroupsE2E:
 
         with patch(
             "litellm.proxy._experimental.mcp_server.auth.user_api_key_auth_mcp.user_api_key_auth",
-            side_effect=mock_user_api_key_auth,
+            new=AsyncMock(side_effect=mock_user_api_key_auth),
         ) as mock_auth:
             # Call the method
             auth_result, mcp_auth_header, mcp_servers, mcp_server_auth_headers, mcp_protocol_version = await MCPRequestHandler.process_mcp_request(scope)
@@ -783,7 +783,7 @@ class TestMCPAccessGroupsE2E:
 
         with patch(
             "litellm.proxy._experimental.mcp_server.auth.user_api_key_auth_mcp.user_api_key_auth",
-            side_effect=mock_user_api_key_auth,
+            new=AsyncMock(side_effect=mock_user_api_key_auth),
         ) as mock_auth:
             # Call the method
             auth_result, mcp_auth_header, mcp_servers, mcp_server_auth_headers, mcp_protocol_version = await MCPRequestHandler.process_mcp_request(scope)

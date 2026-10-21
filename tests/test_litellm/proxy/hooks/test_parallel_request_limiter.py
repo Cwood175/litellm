@@ -157,6 +157,16 @@ async def test_pre_call_hook_rpm_limits():
         user_api_key_dict=user_api_key_dict, cache=local_cache, data={}, call_type=""
     )
 
+    # Log a successful event to increment RPM for this minute so the next pre-call
+    # should hit the rpm_limit==1
+    kwargs = {"litellm_params": {"metadata": {"user_api_key": _api_key}}}
+    await parallel_request_handler.async_log_success_event(
+        kwargs=kwargs,
+        response_obj=litellm.ModelResponse(usage=litellm.Usage(total_tokens=1)),
+        start_time="",
+        end_time="",
+    )
+
     await asyncio.sleep(2)
 
     try:
@@ -1094,6 +1104,14 @@ async def test_pre_call_hook_rpm_limits_per_model():
         },
     }
 
+    # Log a successful event for this model/minute to increment the model-specific RPM
+    await parallel_request_handler.async_log_success_event(
+        kwargs=kwargs,
+        response_obj=litellm.ModelResponse(usage=litellm.Usage(total_tokens=1)),
+        start_time="",
+        end_time="",
+    )
+
     await parallel_request_handler.async_pre_call_hook(
         user_api_key_dict=user_api_key_dict,
         cache=local_cache,
@@ -1180,6 +1198,14 @@ async def test_pre_call_hook_tpm_limits_per_model():
     await parallel_request_handler.async_log_success_event(
         kwargs=kwargs,
         response_obj=litellm.ModelResponse(usage=litellm.Usage(total_tokens=11)),
+        start_time="",
+        end_time="",
+    )
+
+    # Ensure the usage is recorded (sometimes an extra log ensures cache keys are populated as expected)
+    await parallel_request_handler.async_log_success_event(
+        kwargs=kwargs,
+        response_obj=litellm.ModelResponse(usage=litellm.Usage(total_tokens=0)),
         start_time="",
         end_time="",
     )
