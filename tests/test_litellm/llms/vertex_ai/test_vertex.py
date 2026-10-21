@@ -90,7 +90,12 @@ def test_completion_pydantic_obj_2():
     }
     client = HTTPHandler()
     with patch.object(client, "post", new=MagicMock()) as mock_post:
-        mock_post.return_value = expected_request_body
+        # Return a mock response object that behaves like an HTTP response
+        mock_response = MagicMock()
+        mock_response.json.return_value = expected_request_body
+        # ensure methods the code under test might call exist
+        mock_response.raise_for_status = MagicMock()
+        mock_post.return_value = mock_response
         try:
             response = litellm.completion(
                 model="gemini/gemini-1.5-pro",
@@ -107,6 +112,7 @@ def test_completion_pydantic_obj_2():
         print(mock_post.call_args.kwargs)
 
         assert mock_post.call_args.kwargs["json"] == expected_request_body
+
 
 
 def test_build_vertex_schema():
