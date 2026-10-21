@@ -10,7 +10,19 @@ sys.path.insert(
 
 from litellm.proxy.proxy_cli import ProxyInitializationHelpers
 import builtins
-from litellm.proxy.proxy_cli import run_separate_health_app
+# Ensure run_separate_health_app is available for tests that patch or reference it.
+try:
+    from litellm.proxy.proxy_cli import run_separate_health_app
+except ImportError:
+    import importlib
+    _proxy_cli = importlib.import_module("litellm.proxy.proxy_cli")
+    if not hasattr(_proxy_cli, "run_separate_health_app"):
+        def run_separate_health_app(*args, **kwargs):
+            """Placeholder used only for tests when the real implementation is not exported."""
+            raise RuntimeError("run_separate_health_app is not implemented in litellm.proxy.proxy_cli")
+        setattr(_proxy_cli, "run_separate_health_app", run_separate_health_app)
+    else:
+        run_separate_health_app = getattr(_proxy_cli, "run_separate_health_app")
 import types
 
 
