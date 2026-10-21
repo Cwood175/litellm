@@ -29,6 +29,9 @@ def test_initialize_presidio_guardrail():
         },
     }
 
+    # Ensure required environment variable for Presidio initializer
+    os.environ["PRESIDIO_ANALYZER_API_BASE"] = "https://fakelink.com/v1/presidio/analyze"
+
     # Call the initialize_guardrail method
     result = InitializeGuardrails.initialize_guardrail(
         guardrail=test_guardrail,

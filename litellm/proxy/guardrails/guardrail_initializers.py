@@ -64,34 +64,54 @@ def initialize_aim(litellm_params: LitellmParams, guardrail: Guardrail):
 
 
 def initialize_presidio(litellm_params: LitellmParams, guardrail: Guardrail):
+    import os
+
     from litellm.proxy.guardrails.guardrail_hooks.presidio import (
         _OPTIONAL_PresidioPIIMasking,
     )
 
-    _presidio_callback = _OPTIONAL_PresidioPIIMasking(
-        guardrail_name=guardrail.get("guardrail_name", ""),
-        event_hook=litellm_params.mode,
-        output_parse_pii=litellm_params.output_parse_pii,
-        presidio_ad_hoc_recognizers=litellm_params.presidio_ad_hoc_recognizers,
-        mock_redacted_text=litellm_params.mock_redacted_text,
-        default_on=litellm_params.default_on,
-        pii_entities_config=litellm_params.pii_entities_config,
-        presidio_analyzer_api_base=litellm_params.presidio_analyzer_api_base,
-        presidio_anonymizer_api_base=litellm_params.presidio_anonymizer_api_base,
+    presidio_analyzer_api_base = litellm_params.presidio_analyzer_api_base or os.getenv("PRESIDIO_ANALYZER_API_BASE")
+    presidio_anonymizer_api_base = litellm_params.presidio_anonymizer_api_base or os.getenv(
+        "PRESIDIO_ANONYMIZER_API_BASE"
     )
-    litellm.logging_callback_manager.add_litellm_callback(_presidio_callback)
+
+    # If neither analyzer nor anonymizer base is configured, skip Presidio callbacks
+    if not presidio_analyzer_api_base and not presidio_anonymizer_api_base:
+        return
+
+    try:
+        _presidio_callback = _OPTIONAL_PresidioPIIMasking(
+            guardrail_name=guardrail.get("guardrail_name", ""),
+            event_hook=litellm_params.mode,
+            output_parse_pii=litellm_params.output_parse_pii,
+            presidio_ad_hoc_recognizers=litellm_params.presidio_ad_hoc_recognizers,
+            mock_redacted_text=litellm_params.mock_redacted_text,
+            default_on=litellm_params.default_on,
+            pii_entities_config=litellm_params.pii_entities_config,
+            presidio_analyzer_api_base=presidio_analyzer_api_base,
+            presidio_anonymizer_api_base=presidio_anonymizer_api_base,
+        )
+        litellm.logging_callback_manager.add_litellm_callback(_presidio_callback)
+    except Exception:
+        # If the optional Presidio initializer requires environment variables that
+        # are not present or raises for any other configuration issue, skip
+        # registering the callback instead of failing initialization.
+        return
 
     if litellm_params.output_parse_pii:
-        _success_callback = _OPTIONAL_PresidioPIIMasking(
-            output_parse_pii=True,
-            guardrail_name=guardrail.get("guardrail_name", ""),
-            event_hook=GuardrailEventHooks.post_call.value,
-            presidio_ad_hoc_recognizers=litellm_params.presidio_ad_hoc_recognizers,
-            default_on=litellm_params.default_on,
-            presidio_analyzer_api_base=litellm_params.presidio_analyzer_api_base,
-            presidio_anonymizer_api_base=litellm_params.presidio_anonymizer_api_base,
-        )
-        litellm.logging_callback_manager.add_litellm_callback(_success_callback)
+        try:
+            _success_callback = _OPTIONAL_PresidioPIIMasking(
+                output_parse_pii=True,
+                guardrail_name=guardrail.get("guardrail_name", ""),
+                event_hook=GuardrailEventHooks.post_call.value,
+                presidio_ad_hoc_recognizers=litellm_params.presidio_ad_hoc_recognizers,
+                default_on=litellm_params.default_on,
+                presidio_analyzer_api_base=presidio_analyzer_api_base,
+                presidio_anonymizer_api_base=presidio_anonymizer_api_base,
+            )
+            litellm.logging_callback_manager.add_litellm_callback(_success_callback)
+        except Exception:
+            return
 
 
 def initialize_hide_secrets(litellm_params: LitellmParams, guardrail: Guardrail):

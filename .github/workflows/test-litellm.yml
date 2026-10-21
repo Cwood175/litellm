@@ -1,8 +1,6 @@
 name: LiteLLM Mock Tests (folder - tests/litellm)
 
-on:
-  pull_request:
-    branches: [ main ]
+on: push
 
 jobs:
   test:
@@ -35,5 +33,5 @@ jobs:
         python -m pip install -e .
         cd ..
     - name: Run tests
-      run: |
+      run: |-
         poetry run pytest tests/litellm -x -vv -n 4 

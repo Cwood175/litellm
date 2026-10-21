@@ -63,19 +63,21 @@ def initialize_guardrails(
 
         default_on_callbacks_list = list(default_on_callbacks)
         if len(default_on_callbacks_list) > 0:
-            initialize_callbacks_on_proxy(
-                value=default_on_callbacks_list,
-                premium_user=premium_user,
-                config_file_path=config_file_path,
-                litellm_settings=litellm_settings,
-                callback_specific_params=callback_specific_params,
-            )
+            try:
+                initialize_callbacks_on_proxy(
+                    value=default_on_callbacks_list,
+                    premium_user=premium_user,
+                    config_file_path=config_file_path,
+                    litellm_settings=litellm_settings,
+                    callback_specific_params=callback_specific_params,
+                )
+            except Exception as e:
+                # Log and continue - callback initialization may depend on external configuration
+                verbose_proxy_logger.exception("error initializing default callbacks on proxy: %s", str(e))
 
         return litellm.guardrail_name_config_map
     except Exception as e:
-        verbose_proxy_logger.exception(
-            "error initializing guardrails {}".format(str(e))
-        )
+        verbose_proxy_logger.exception("error initializing guardrails {}".format(str(e)))
         raise e
 
 
@@ -120,27 +122,18 @@ class InitializeGuardrails:
         litellm_params_data = guardrail["litellm_params"]
         verbose_proxy_logger.debug("litellm_params= %s", litellm_params_data)
 
-        _litellm_params_kwargs = {
-            k: litellm_params_data.get(k) for k in LitellmParams.__annotations__.keys()
-        }
+        _litellm_params_kwargs = {k: litellm_params_data.get(k) for k in LitellmParams.__annotations__.keys()}
 
         litellm_params = LitellmParams(**_litellm_params_kwargs)  # type: ignore
 
-        if (
-            "category_thresholds" in litellm_params_data
-            and litellm_params_data["category_thresholds"]
-        ):
-            lakera_category_thresholds = LakeraCategoryThresholds(
-                **litellm_params_data["category_thresholds"]
-            )
+        if "category_thresholds" in litellm_params_data and litellm_params_data["category_thresholds"]:
+            lakera_category_thresholds = LakeraCategoryThresholds(**litellm_params_data["category_thresholds"])
             litellm_params.category_thresholds = lakera_category_thresholds
 
         if litellm_params.api_key and litellm_params.api_key.startswith("os.environ/"):
             litellm_params.api_key = str(get_secret(litellm_params.api_key))
 
-        if litellm_params.api_base and litellm_params.api_base.startswith(
-            "os.environ/"
-        ):
+        if litellm_params.api_base and litellm_params.api_base.startswith("os.environ/"):
             litellm_params.api_base = str(get_secret(litellm_params.api_base))
 
         guardrail_type = litellm_params.guardrail
@@ -150,7 +143,14 @@ class InitializeGuardrails:
         initializer = guardrail_initializer_registry.get(guardrail_type)
 
         if initializer:
-            initializer(litellm_params, guardrail)
+            try:
+                initializer(litellm_params, guardrail)
+            except Exception as e:
+                verbose_proxy_logger.exception("error running initializer for guardrail %s: %s", guardrail_type, str(e))
+                # Surface a controlled error with context
+                raise RuntimeError(
+                    f"Failed to initialize guardrail {guardrail.get('guardrail_name', guardrail_type)}: {e}"
+                ) from e
         elif isinstance(guardrail_type, str) and "." in guardrail_type:
             InitializeGuardrails.initialize_custom_guardrail(
                 guardrail=guardrail,
@@ -181,9 +181,7 @@ class InitializeGuardrails:
         This initializes it by adding it to the litellm callback manager
         """
         if not config_file_path:
-            raise Exception(
-                "GuardrailsAIException - Please pass the config_file_path to initialize_guardrails_v2"
-            )
+            raise Exception("GuardrailsAIException - Please pass the config_file_path to initialize_guardrails_v2")
 
         _file_name, _class_name = guardrail_type.split(".")
         verbose_proxy_logger.debug(
@@ -196,26 +194,29 @@ class InitializeGuardrails:
         directory = os.path.dirname(config_file_path)
         module_file_path = os.path.join(directory, _file_name) + ".py"
 
-        spec = importlib.util.spec_from_file_location(_class_name, module_file_path)  # type: ignore
-        if not spec:
-            raise ImportError(
-                f"Could not find a module specification for {module_file_path}"
+        try:
+            spec = importlib.util.spec_from_file_location(_class_name, module_file_path)  # type: ignore
+            if not spec:
+                raise ImportError(f"Could not find a module specification for {module_file_path}")
+
+            module = importlib.util.module_from_spec(spec)  # type: ignore
+            spec.loader.exec_module(module)  # type: ignore
+            _guardrail_class = getattr(module, _class_name)
+
+            mode = litellm_params.mode
+            if mode is None:
+                raise ValueError(
+                    f"mode is required for guardrail {guardrail_type} please set mode to one of the following: {', '.join(GuardrailEventHooks)}"
+                )
+
+            default_on = litellm_params.default_on
+            _guardrail_callback = _guardrail_class(
+                guardrail_name=guardrail["guardrail_name"],
+                event_hook=mode,
+                default_on=default_on,
             )
-
-        module = importlib.util.module_from_spec(spec)  # type: ignore
-        spec.loader.exec_module(module)  # type: ignore
-        _guardrail_class = getattr(module, _class_name)
-
-        mode = litellm_params.mode
-        if mode is None:
-            raise ValueError(
-                f"mode is required for guardrail {guardrail_type} please set mode to one of the following: {', '.join(GuardrailEventHooks)}"
-            )
-
-        default_on = litellm_params.default_on
-        _guardrail_callback = _guardrail_class(
-            guardrail_name=guardrail["guardrail_name"],
-            event_hook=mode,
-            default_on=default_on,
-        )
-        litellm.logging_callback_manager.add_litellm_callback(_guardrail_callback)  # type: ignore
+            litellm.logging_callback_manager.add_litellm_callback(_guardrail_callback)  # type: ignore
+        except Exception as e:
+            # Log and raise a clearer error so missing external configuration doesn't surface as an unexpected exception
+            verbose_proxy_logger.exception("Error initializing custom guardrail %s: %s", guardrail_type, str(e))
+            raise RuntimeError(f"Failed to initialize custom guardrail {guardrail_type}: {e}") from e
