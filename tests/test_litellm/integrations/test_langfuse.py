@@ -21,7 +21,7 @@ def test_max_langfuse_clients_limit():
     """
     # Set max clients to 2 for testing
     with patch(
-        "litellm.integrations.langfuse.langfuse.MAX_LANGFUSE_INITIALIZED_CLIENTS", 2
+        "litellm.integrations.langfuse.langfuse.MAX_LANGFUSE_INITIALIZED_CLIENTS", 2, create=True
     ):
         # Reset the counter
         litellm.initialized_langfuse_clients = 0
