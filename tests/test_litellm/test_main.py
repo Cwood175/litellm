@@ -151,6 +151,7 @@ async def test_url_with_format_param(model, sync_mode, monkeypatch):
     else:
         client = AsyncHTTPHandler()
 
+    # Use an inline base64 image to avoid external network fetches in tests
     args = {
         "model": model,
         "messages": [
@@ -158,9 +159,9 @@ async def test_url_with_format_param(model, sync_mode, monkeypatch):
                 "role": "user",
                 "content": [
                     {
-                        "type": "image_url",
-                        "image_url": {
-                            "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/d/dd/Gfp-wisconsin-madison-the-nature-boardwalk.jpg/2560px-Gfp-wisconsin-madison-the-nature-boardwalk.jpg",
+                        "type": "image_base64",
+                        "image_base64": {
+                            "b64": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR4nGMAAQAABQABDQottAAAAABJRU5ErkJggg==",
                             "format": "image/png",
                         },
                     },
@@ -170,14 +171,11 @@ async def test_url_with_format_param(model, sync_mode, monkeypatch):
         ],
     }
     with patch.object(client, "post", new=MagicMock()) as mock_client:
-        try:
-            if sync_mode:
-                response = completion(**args, client=client)
-            else:
-                response = await acompletion(**args, client=client)
-            print(response)
-        except Exception as e:
-            pass
+        if sync_mode:
+            response = completion(**args, client=client)
+        else:
+            response = await acompletion(**args, client=client)
+        print(response)
 
         mock_client.assert_called()
 
@@ -209,6 +207,8 @@ async def test_url_with_format_param_openai(model, sync_mode):
     else:
         client = AsyncOpenAI()
 
+    # Use an inline base64 image and omit the explicit 'format' key so the OpenAI
+    # call payload does not include a separate 'format' field and no network fetch is needed.
     args = {
         "model": model,
         "messages": [
@@ -216,10 +216,9 @@ async def test_url_with_format_param_openai(model, sync_mode):
                 "role": "user",
                 "content": [
                     {
-                        "type": "image_url",
-                        "image_url": {
-                            "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/d/dd/Gfp-wisconsin-madison-the-nature-boardwalk.jpg/2560px-Gfp-wisconsin-madison-the-nature-boardwalk.jpg",
-                            "format": "image/png",
+                        "type": "image_base64",
+                        "image_base64": {
+                            "b64": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR4nGMAAQAABQABDQottAAAAABJRU5ErkJggg=="
                         },
                     },
                     {"type": "text", "text": "Describe this image"},
@@ -230,14 +229,11 @@ async def test_url_with_format_param_openai(model, sync_mode):
     with patch.object(
         client.chat.completions.with_raw_response, "create"
     ) as mock_client:
-        try:
-            if sync_mode:
-                response = completion(**args, client=client)
-            else:
-                response = await acompletion(**args, client=client)
-            print(response)
-        except Exception as e:
-            print(e)
+        if sync_mode:
+            response = completion(**args, client=client)
+        else:
+            response = await acompletion(**args, client=client)
+        print(response)
 
         mock_client.assert_called()
 
