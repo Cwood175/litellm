@@ -1,8 +1,6 @@
 name: LiteLLM Linting
 
-on:
-  pull_request:
-    branches: [ main ]
+on: push
 
 jobs:
   lint:
@@ -47,7 +45,7 @@ jobs:
         git log --oneline -3
         echo "File content around line 43:"
         head -50 litellm/litellm_core_utils/custom_logger_registry.py | tail -10
-        
+
     - name: Run Ruff linting
       run: |
         cd litellm
@@ -71,5 +69,5 @@ jobs:
         cd ..
 
     - name: Check import safety
-      run: |
+      run: |-
         poetry run python -c "from litellm import *" || (echo '🚨 import failed, this means you introduced unprotected imports! 🚨'; exit 1)

@@ -2136,7 +2136,9 @@ async def test_filter_tools_by_allowed_tools_integration():
 
             # Verify the manager methods were called correctly
             mock_manager.get_allowed_mcp_servers.assert_called_once_with(mock_user_auth)
-            mock_manager.get_mcp_servers_from_ids.assert_called_once_with(["test-server-123"])
+            mock_manager.get_mcp_servers_from_ids.assert_called_once_with(
+                ["test-server-123"]
+            )
             mock_manager._get_tools_from_server.assert_called_once()
 
 
@@ -2243,7 +2245,9 @@ async def test_filter_tools_by_disallowed_tools_integration():
 
             # Verify the manager methods were called correctly
             mock_manager.get_allowed_mcp_servers.assert_called_once_with(mock_user_auth)
-            mock_manager.get_mcp_servers_from_ids.assert_called_once_with(["test-server-456"])
+            mock_manager.get_mcp_servers_from_ids.assert_called_once_with(
+                ["test-server-456"]
+            )
             mock_manager._get_tools_from_server.assert_called_once()
 
 
